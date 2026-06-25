@@ -1,0 +1,6 @@
+venv/
+ACDC_preprocessed/
+*.zip
+*.h5
+__pycache__/
+.ipynb_checkpoints/
