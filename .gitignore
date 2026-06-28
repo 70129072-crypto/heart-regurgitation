@@ -4,3 +4,5 @@ ACDC_preprocessed/
 *.h5
 __pycache__/
 .ipynb_checkpoints/
+*.pem
+.env
