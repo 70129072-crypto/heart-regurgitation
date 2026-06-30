@@ -30,23 +30,23 @@
       </div>
 
       <nav class="sidebar-nav" aria-label="Main navigation">
-        <a href="/dashboard" class="nav-item active">
+        <a href="#" class="nav-item active" data-view="overview">
           <i class="fa-solid fa-gauge-high nav-icon"></i>
           <span>Overview</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-view="analyses">
           <i class="fa-solid fa-microscope nav-icon"></i>
           <span>Analyses</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-view="patients">
           <i class="fa-solid fa-user-injured nav-icon"></i>
           <span>Patients</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-view="reports">
           <i class="fa-solid fa-file-medical nav-icon"></i>
           <span>Reports</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-view="settings">
           <i class="fa-solid fa-gear nav-icon"></i>
           <span>Settings</span>
         </a>
@@ -69,7 +69,9 @@
             <i class="fa-solid fa-house-medical"></i>
             <span class="bc-label">Home</span>
             <i class="fa-solid fa-chevron-right bc-sep"></i>
-            <span class="bc-label bc-active">Dashboard</span>
+            <span class="bc-label bc-active" id="breadcrumbActive"
+              >Dashboard</span
+            >
           </nav>
         </div>
         <div class="topbar-right">
@@ -88,149 +90,503 @@
         </div>
       </header>
 
-      <!-- ── Page heading ── -->
-      <section class="page-heading">
-        <div class="page-heading-text">
-          <h1 class="page-title">
-            Left Ventricle Segmentation &amp; Classification Dashboard
-          </h1>
-          <p class="page-sub">
-            Real-time analysis results and model performance metrics
-          </p>
-        </div>
-        <button class="btn-new-analysis" id="newAnalysisBtn" type="button">
-          <i class="fa-solid fa-plus"></i>
-          New Analysis
-        </button>
-        <button class="btn-refresh" id="refreshBtn" type="button">
-          <i class="fa-solid fa-arrows-rotate"></i>
-          Refresh
-        </button>
-      </section>
-
-      <!-- ── Loading state ── -->
-      <div class="loading-zone" id="loadingZone">
-        <div class="loading-spinner-wrap">
-          <div class="loading-ring"></div>
-          <div class="loading-heart">
-            <i class="fa-solid fa-heart-pulse"></i>
-          </div>
-        </div>
-        <p class="loading-text">Loading dashboard data…</p>
-      </div>
-
-      <!-- ── Error banner ── -->
-      <div class="error-banner" id="errorBanner" style="display: none">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <span id="errorBannerMsg">Failed to load dashboard data.</span>
-        <button class="err-retry-btn" id="retryBtn" type="button">Retry</button>
-      </div>
-
-      <!-- ── Stats cards ── -->
-      <section class="stats-grid" id="statsGrid" style="display: none">
-        <div class="stat-card stat-card--blue">
-          <div class="stat-card-top">
-            <div class="stat-card-icon">
-              <i class="fa-solid fa-wave-square"></i>
-            </div>
-            <div class="stat-card-badge stat-card-badge--blue">All time</div>
-          </div>
-          <div class="stat-card-body">
-            <p class="stat-card-label">Total Analyses</p>
-            <p class="stat-card-value" id="statTotal">—</p>
-          </div>
-          <div class="stat-card-footer">
-            <i class="fa-solid fa-arrow-trend-up stat-trend-icon"></i>
-            <span>Cumulative records</span>
-          </div>
-        </div>
-
-        <div class="stat-card stat-card--teal">
-          <div class="stat-card-top">
-            <div class="stat-card-icon">
-              <i class="fa-solid fa-bullseye"></i>
-            </div>
-            <div class="stat-card-badge stat-card-badge--teal">Model</div>
-          </div>
-          <div class="stat-card-body">
-            <p class="stat-card-label">Average Accuracy</p>
-            <p class="stat-card-value" id="statAccuracy">—</p>
-          </div>
-          <div class="stat-card-footer">
-            <i class="fa-solid fa-microchip stat-trend-icon"></i>
-            <span>Deep learning model</span>
-          </div>
-        </div>
-
-        <div class="stat-card stat-card--green">
-          <div class="stat-card-top">
-            <div class="stat-card-icon">
-              <i class="fa-solid fa-heart-circle-check"></i>
-            </div>
-            <div class="stat-card-badge stat-card-badge--green">EF ≥ 55%</div>
-          </div>
-          <div class="stat-card-body">
-            <p class="stat-card-label">Normal Cases</p>
-            <p class="stat-card-value" id="statNormal">—</p>
-          </div>
-          <div class="stat-card-footer">
-            <i class="fa-solid fa-circle-check stat-trend-icon"></i>
-            <span>Healthy ejection fraction</span>
-          </div>
-        </div>
-
-        <div class="stat-card stat-card--red">
-          <div class="stat-card-top">
-            <div class="stat-card-icon">
-              <i class="fa-solid fa-heart-crack"></i>
-            </div>
-            <div class="stat-card-badge stat-card-badge--red">EF &lt; 30%</div>
-          </div>
-          <div class="stat-card-body">
-            <p class="stat-card-label">Severe Cases</p>
-            <p class="stat-card-value" id="statSevere">—</p>
-          </div>
-          <div class="stat-card-footer">
-            <i class="fa-solid fa-triangle-exclamation stat-trend-icon"></i>
-            <span>Requires urgent review</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── Recent analyses table ── -->
-      <section class="table-section" id="tableSection" style="display: none">
-        <div class="table-card-header">
-          <div class="table-card-header-left">
-            <h2 class="table-title">Recent Analyses</h2>
-            <p class="table-sub">
-              Latest left ventricle segmentation &amp; classification results
+      <!-- ══ VIEW: OVERVIEW ══ -->
+      <div id="view-overview" class="view-section">
+        <!-- ── Page heading ── -->
+        <section class="page-heading">
+          <div class="page-heading-text">
+            <h1 class="page-title">
+              Left Ventricle Segmentation &amp; Classification Dashboard
+            </h1>
+            <p class="page-sub">
+              Real-time analysis results and model performance metrics
             </p>
           </div>
-          <div class="table-card-header-right">
-            <span class="record-pill" id="recordCount">— records</span>
+          <button class="btn-new-analysis" id="newAnalysisBtn" type="button">
+            <i class="fa-solid fa-plus"></i>
+            New Analysis
+          </button>
+          <button class="btn-refresh" id="refreshBtn" type="button">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            Refresh
+          </button>
+        </section>
+
+        <!-- ── Loading state ── -->
+        <div class="loading-zone" id="loadingZone">
+          <div class="loading-spinner-wrap">
+            <div class="loading-ring"></div>
+            <div class="loading-heart">
+              <i class="fa-solid fa-heart-pulse"></i>
+            </div>
           </div>
+          <p class="loading-text">Loading dashboard data…</p>
         </div>
 
-        <div class="table-scroll">
-          <table class="analyses-table" id="analysesTable">
-            <thead>
-              <tr>
-                <th>Analysis ID</th>
-                <th>Patient ID</th>
-                <th>Date</th>
-                <th>Ejection Fraction</th>
-                <th>Severity</th>
-                <th>Model Confidence</th>
-                <th>Status</th>
-                <th>MRI Scan</th>
-              </tr>
-            </thead>
-            <tbody id="analysesBody">
-              <!-- populated by dashboard.js -->
-            </tbody>
-          </table>
+        <!-- ── Error banner ── -->
+        <div class="error-banner" id="errorBanner" style="display: none">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="errorBannerMsg">Failed to load dashboard data.</span>
+          <button class="err-retry-btn" id="retryBtn" type="button">
+            Retry
+          </button>
         </div>
-      </section>
+
+        <!-- ── Stats cards ── -->
+        <section class="stats-grid" id="statsGrid" style="display: none">
+          <div class="stat-card stat-card--blue">
+            <div class="stat-card-top">
+              <div class="stat-card-icon">
+                <i class="fa-solid fa-wave-square"></i>
+              </div>
+              <div class="stat-card-badge stat-card-badge--blue">All time</div>
+            </div>
+            <div class="stat-card-body">
+              <p class="stat-card-label">Total Analyses</p>
+              <p class="stat-card-value" id="statTotal">—</p>
+            </div>
+            <div class="stat-card-footer">
+              <i class="fa-solid fa-arrow-trend-up stat-trend-icon"></i>
+              <span>Cumulative records</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card--teal">
+            <div class="stat-card-top">
+              <div class="stat-card-icon">
+                <i class="fa-solid fa-bullseye"></i>
+              </div>
+              <div class="stat-card-badge stat-card-badge--teal">Model</div>
+            </div>
+            <div class="stat-card-body">
+              <p class="stat-card-label">Average Accuracy</p>
+              <p class="stat-card-value" id="statAccuracy">—</p>
+            </div>
+            <div class="stat-card-footer">
+              <i class="fa-solid fa-microchip stat-trend-icon"></i>
+              <span>Deep learning model</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card--green">
+            <div class="stat-card-top">
+              <div class="stat-card-icon">
+                <i class="fa-solid fa-heart-circle-check"></i>
+              </div>
+              <div class="stat-card-badge stat-card-badge--green">EF ≥ 55%</div>
+            </div>
+            <div class="stat-card-body">
+              <p class="stat-card-label">Normal Cases</p>
+              <p class="stat-card-value" id="statNormal">—</p>
+            </div>
+            <div class="stat-card-footer">
+              <i class="fa-solid fa-circle-check stat-trend-icon"></i>
+              <span>Healthy ejection fraction</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card--red">
+            <div class="stat-card-top">
+              <div class="stat-card-icon">
+                <i class="fa-solid fa-heart-crack"></i>
+              </div>
+              <div class="stat-card-badge stat-card-badge--red">
+                EF &lt; 30%
+              </div>
+            </div>
+            <div class="stat-card-body">
+              <p class="stat-card-label">Severe Cases</p>
+              <p class="stat-card-value" id="statSevere">—</p>
+            </div>
+            <div class="stat-card-footer">
+              <i class="fa-solid fa-triangle-exclamation stat-trend-icon"></i>
+              <span>Requires urgent review</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Recent analyses table ── -->
+        <section class="table-section" id="tableSection" style="display: none">
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <h2 class="table-title">Recent Analyses</h2>
+              <p class="table-sub">
+                Latest left ventricle segmentation &amp; classification results
+              </p>
+            </div>
+            <div class="table-card-header-right">
+              <span class="record-pill" id="recordCount">— records</span>
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table class="analyses-table" id="analysesTable">
+              <thead>
+                <tr>
+                  <th>Analysis ID</th>
+                  <th>Patient ID</th>
+                  <th>Date</th>
+                  <th>Ejection Fraction</th>
+                  <th>Severity</th>
+                  <th>Model Confidence</th>
+                  <th>Status</th>
+                  <th>MRI Scan</th>
+                </tr>
+              </thead>
+              <tbody id="analysesBody">
+                <!-- populated by dashboard.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <!-- /view-overview -->
+
+      <!-- ══ VIEW: ANALYSES ══ -->
+      <div id="view-analyses" class="view-section" style="display: none">
+        <section class="page-heading">
+          <div class="page-heading-text">
+            <h1 class="page-title">All Analyses</h1>
+            <p class="page-sub">
+              Search and filter all cardiac MRI analysis records
+            </p>
+          </div>
+          <button class="btn-new-analysis" id="newAnalysisBtnAlt" type="button">
+            <i class="fa-solid fa-plus"></i>
+            New Analysis
+          </button>
+        </section>
+
+        <div class="filter-bar">
+          <div class="search-box-wrap">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input
+              type="text"
+              id="analysesSearchInput"
+              class="search-input"
+              placeholder="Search by Patient ID or Analysis ID…"
+              autocomplete="off"
+            />
+          </div>
+          <select id="analysesSeverityFilter" class="filter-select">
+            <option value="">All Severities</option>
+            <option value="Normal">Normal</option>
+            <option value="Mild">Mild</option>
+            <option value="Moderate">Moderate</option>
+            <option value="Severe">Severe</option>
+          </select>
+        </div>
+
+        <section class="table-section" id="analysesFullSection">
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <h2 class="table-title">Analysis Records</h2>
+              <p class="table-sub">All left ventricle segmentation results</p>
+            </div>
+            <span class="record-pill" id="analysesRecordCount">— records</span>
+          </div>
+          <div class="table-scroll">
+            <table class="analyses-table">
+              <thead>
+                <tr>
+                  <th>Analysis ID</th>
+                  <th>Patient ID</th>
+                  <th>Date</th>
+                  <th>Ejection Fraction</th>
+                  <th>Severity</th>
+                  <th>Model Confidence</th>
+                  <th>Status</th>
+                  <th>MRI Scan</th>
+                </tr>
+              </thead>
+              <tbody id="analysesFullBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <!-- /view-analyses -->
+
+      <!-- ══ VIEW: PATIENTS ══ -->
+      <div id="view-patients" class="view-section" style="display: none">
+        <!-- <section class="page-heading">
+          <div class="page-heading-text">
+            <h1 class="page-title">Patients</h1>
+            <p class="page-sub">
+              All patients with cardiac MRI analysis records
+            </p>
+          </div>
+        </section> -->
+
+        <section class="table-section" id="patientsListSection">
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <h2 class="table-title">Patient Records</h2>
+              <p class="table-sub">
+                Click a row to view all analyses for that patient
+              </p>
+            </div>
+            <span class="record-pill" id="patientsRecordCount">— patients</span>
+          </div>
+          <div class="table-scroll">
+            <table class="analyses-table">
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Total Analyses</th>
+                  <th>Last Analysis</th>
+                  <th>Latest EF</th>
+                  <th>Latest Severity</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="patientsBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="table-section"
+          id="patientDetailSection"
+          style="display: none"
+        >
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <button class="btn-back" id="patientBackBtn" type="button">
+                <i class="fa-solid fa-arrow-left"></i> All Patients
+              </button>
+              <h2
+                class="table-title"
+                id="patientDetailTitle"
+                style="margin-top: 6px"
+              >
+                Patient Analyses
+              </h2>
+              <p class="table-sub" id="patientDetailSub"></p>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="analyses-table">
+              <thead>
+                <tr>
+                  <th>Analysis ID</th>
+                  <th>Date</th>
+                  <th>Ejection Fraction</th>
+                  <th>Severity</th>
+                  <th>Model Confidence</th>
+                  <th>Status</th>
+                  <th>MRI Scan</th>
+                </tr>
+              </thead>
+              <tbody id="patientAnalysesBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <!-- /view-patients -->
+
+      <!-- ══ VIEW: REPORTS ══ -->
+      <div id="view-reports" class="view-section" style="display: none">
+        <section class="page-heading">
+          <div class="page-heading-text">
+            <h1 class="page-title">Reports &amp; Export</h1>
+            <p class="page-sub">
+              Generate and download cardiac analysis reports
+            </p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn-refresh" id="exportCsvBtn" type="button">
+              <i class="fa-solid fa-file-csv"></i>
+              Export CSV
+            </button>
+            <button class="btn-new-analysis" id="printReportBtn" type="button">
+              <i class="fa-solid fa-print"></i>
+              Print Report
+            </button>
+          </div>
+        </section>
+
+        <section
+          class="stats-grid"
+          id="reportsStatsGrid"
+          style="display: none"
+        ></section>
+
+        <section
+          class="table-section"
+          id="reportsSeveritySection"
+          style="display: none"
+        >
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <h2 class="table-title">Severity Distribution</h2>
+              <p class="table-sub">
+                Breakdown of all analyses by cardiac condition severity
+              </p>
+            </div>
+          </div>
+          <div class="severity-bars-wrap" id="severityBarsWrap"></div>
+        </section>
+
+        <section
+          class="table-section"
+          id="reportsTableSection"
+          style="display: none"
+        >
+          <div class="table-card-header">
+            <div class="table-card-header-left">
+              <h2 class="table-title">Analysis Summary</h2>
+              <p class="table-sub">Complete list of all analysis records</p>
+            </div>
+            <span class="record-pill" id="reportsRecordCount">— records</span>
+          </div>
+          <div class="table-scroll">
+            <table class="analyses-table">
+              <thead>
+                <tr>
+                  <th>Analysis ID</th>
+                  <th>Patient ID</th>
+                  <th>Date</th>
+                  <th>Ejection Fraction</th>
+                  <th>Severity</th>
+                  <th>Model Confidence</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="reportsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <!-- /view-reports -->
+
+      <!-- ══ VIEW: SETTINGS ══ -->
+      <div id="view-settings" class="view-section" style="display: none">
+        <section class="page-heading">
+          <div class="page-heading-text">
+            <h1 class="page-title">Settings</h1>
+            <p class="page-sub">Manage your account preferences and security</p>
+          </div>
+        </section>
+
+        <div class="settings-grid">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon-box">
+                <i class="fa-solid fa-user-circle"></i>
+              </div>
+              <div>
+                <h3 class="settings-card-title">Profile</h3>
+                <p class="settings-card-sub">Update your display name</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input
+                  type="text"
+                  id="settingsName"
+                  class="settings-input"
+                  placeholder="Your full name"
+                  autocomplete="off"
+                  maxlength="100"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input
+                  type="email"
+                  id="settingsEmail"
+                  class="settings-input settings-input--readonly"
+                  placeholder="your@email.com"
+                  readonly
+                />
+                <p class="form-hint">
+                  Email cannot be changed after registration.
+                </p>
+              </div>
+              <div
+                class="settings-msg settings-msg--success"
+                id="profileSuccessMsg"
+                style="display: none"
+              ></div>
+              <div
+                class="settings-msg settings-msg--error"
+                id="profileErrorMsg"
+                style="display: none"
+              ></div>
+              <button
+                class="btn-modal-analyze"
+                id="saveProfileBtn"
+                type="button"
+              >
+                <i class="fa-solid fa-floppy-disk"></i>&nbsp;Save Changes
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon-box">
+                <i class="fa-solid fa-lock"></i>
+              </div>
+              <div>
+                <h3 class="settings-card-title">Change Password</h3>
+                <p class="settings-card-sub">Update your account password</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="form-group">
+                <label class="form-label">Current Password</label>
+                <input
+                  type="password"
+                  id="settingsCurrentPw"
+                  class="settings-input"
+                  placeholder="Enter current password"
+                  autocomplete="current-password"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input
+                  type="password"
+                  id="settingsNewPw"
+                  class="settings-input"
+                  placeholder="Minimum 8 characters"
+                  autocomplete="new-password"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input
+                  type="password"
+                  id="settingsConfirmPw"
+                  class="settings-input"
+                  placeholder="Repeat new password"
+                  autocomplete="new-password"
+                />
+              </div>
+              <div
+                class="settings-msg settings-msg--success"
+                id="passwordSuccessMsg"
+                style="display: none"
+              ></div>
+              <div
+                class="settings-msg settings-msg--error"
+                id="passwordErrorMsg"
+                style="display: none"
+              ></div>
+              <button
+                class="btn-modal-analyze"
+                id="savePasswordBtn"
+                type="button"
+              >
+                <i class="fa-solid fa-key"></i>&nbsp;Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /view-settings -->
     </main>
     <!-- /main-content -->
 
@@ -268,6 +624,19 @@
         <!-- ── Upload form ── -->
         <div id="modalForm">
           <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">
+                Patient ID <span class="form-req">*</span>
+              </label>
+              <input
+                type="text"
+                id="patientIdInput"
+                class="modal-input"
+                placeholder="e.g. PT-1001, John Doe, MRN-8821"
+                autocomplete="off"
+                maxlength="50"
+              />
+            </div>
             <div class="form-group">
               <label class="form-label">
                 MRI Scan File <span class="form-req">*</span>

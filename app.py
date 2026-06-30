@@ -7,20 +7,22 @@ GET  /               → sign-in page
 GET  /dashboard      → dashboard page
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from functools import wraps
 import sqlite3
 import hashlib
 import datetime
 import os
+import re
 import io
-import uuid
 import base64
 import jwt
+import numpy as np
+from PIL import Image
 from dotenv import load_dotenv
 
-load_dotenv()  # load .env variables into os.environ
+load_dotenv()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
@@ -90,23 +92,14 @@ def _preprocess_image(file_bytes: bytes, ext: str):
     Convert raw file bytes to a (1, 256, 256, 1) float32 NumPy array
     normalised to [0, 1].  Supported: .h5 (ACDC), .png, .jpg/.jpeg
     """
-    import numpy as np
-
     if ext == ".h5":
-        import h5py, tempfile
-        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
-            tmp.write(file_bytes)
-            tmp_path = tmp.name
-        try:
-            with h5py.File(tmp_path, "r") as f:
-                img = f["image"][:]          # (H,W) or (slices,H,W)
-            if img.ndim == 3:                # pick the middle slice
-                img = img[img.shape[0] // 2]
-        finally:
-            os.unlink(tmp_path)
+        import h5py
+        with h5py.File(io.BytesIO(file_bytes), "r") as f:
+            img = f["image"][:]          # (H,W) or (slices,H,W)
+        if img.ndim == 3:                # pick the middle slice
+            img = img[img.shape[0] // 2]
         img = img.astype(np.float32)
     else:
-        from PIL import Image
         img = np.array(
             Image.open(io.BytesIO(file_bytes)).convert("L"),
             dtype=np.float32,
@@ -131,7 +124,6 @@ def _compute_ef(pred_mask) -> float:
     - Normal LV + normal walls    → WTCR ≈ 0.7 → EF ≈ 55-60%
     - Thick walls (HCM)           → high WTCR → high EF
     """
-    import numpy as np
     lv_area  = int(np.sum(pred_mask == 1))
     myo_area = int(np.sum(pred_mask == 3))
     if lv_area + myo_area < 100:            # no cardiac structure detected
@@ -157,9 +149,6 @@ def _render_overlay(img_array, pred_mask) -> str:
     left = original grayscale MRI, right = MRI + coloured segmentation overlay.
     Colours: LV=red(255,80,80)  RV=blue(80,150,255)  MYO=green(80,220,80)
     """
-    import numpy as np
-    from PIL import Image
-
     img_2d = img_array[0, :, :, 0]                         # (256,256) float32 [0,1]
     mn, mx = img_2d.min(), img_2d.max()
     img_u8 = ((img_2d - mn) / max(mx - mn, 1e-8) * 255).astype(np.uint8)
@@ -205,6 +194,7 @@ def init_db():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS analyses (
             analysis_id        TEXT  PRIMARY KEY,
+            user_id            INTEGER NOT NULL DEFAULT 0,
             patient_id         TEXT  NOT NULL,
             analysis_date      TEXT  NOT NULL,
             ejection_fraction  REAL  NOT NULL,
@@ -221,6 +211,22 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    # Migrate existing databases: add user_id column if missing
+    try:
+        cur.execute("ALTER TABLE analyses ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
+    # Indexes for efficient sorting and ID-generation queries
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analyses_date "
+        "ON analyses (analysis_date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analyses_ptid "
+        "ON analyses (patient_id)"
+    )
+
     # Seed demo user  (password: Demo@1234)
     ph = hashlib.sha256("Demo@1234".encode()).hexdigest()
     try:
@@ -231,29 +237,43 @@ def init_db():
     except sqlite3.IntegrityError:
         pass
 
-    # Seed demo analyses
+    # Look up demo user id for seeding
+    demo_user = cur.execute(
+        "SELECT id FROM users WHERE email = ?", ("demo@cardioai.com",)
+    ).fetchone()
+    demo_uid = demo_user["id"] if demo_user else 0
+
+    # Seed demo analyses (linked to demo user)
     seed = [
-        ("CA-2401", "PT-8821", "2024-01-08", 58.4, "Normal",   95.2, "Completed"),
-        ("CA-2402", "PT-8822", "2024-01-09", 44.1, "Mild",     91.7, "Completed"),
-        ("CA-2403", "PT-8823", "2024-01-10", 36.8, "Moderate", 88.4, "Completed"),
-        ("CA-2404", "PT-8824", "2024-01-11", 27.3, "Severe",   90.1, "Completed"),
-        ("CA-2405", "PT-8825", "2024-01-12", 62.0, "Normal",   96.5, "Completed"),
-        ("CA-2406", "PT-8826", "2024-01-13", 47.5, "Mild",     92.3, "Processing"),
-        ("CA-2407", "PT-8827", "2024-01-14", 38.2, "Moderate", 87.9, "Completed"),
-        ("CA-2408", "PT-8828", "2024-01-15", 55.9, "Normal",   94.8, "Completed"),
-        ("CA-2409", "PT-8829", "2024-01-16", 31.4, "Severe",   89.2, "Completed"),
-        ("CA-2410", "PT-8830", "2024-01-17", 60.7, "Normal",   95.9, "Completed"),
+        ("CA-2401", demo_uid, "PT-8821", "2024-01-08", 58.4, "Normal",   95.2, "Completed"),
+        ("CA-2402", demo_uid, "PT-8822", "2024-01-09", 44.1, "Mild",     91.7, "Completed"),
+        ("CA-2403", demo_uid, "PT-8823", "2024-01-10", 36.8, "Moderate", 88.4, "Completed"),
+        ("CA-2404", demo_uid, "PT-8824", "2024-01-11", 27.3, "Severe",   90.1, "Completed"),
+        ("CA-2405", demo_uid, "PT-8825", "2024-01-12", 62.0, "Normal",   96.5, "Completed"),
+        ("CA-2406", demo_uid, "PT-8826", "2024-01-13", 47.5, "Mild",     92.3, "Processing"),
+        ("CA-2407", demo_uid, "PT-8827", "2024-01-14", 38.2, "Moderate", 87.9, "Completed"),
+        ("CA-2408", demo_uid, "PT-8828", "2024-01-15", 55.9, "Normal",   94.8, "Completed"),
+        ("CA-2409", demo_uid, "PT-8829", "2024-01-16", 31.4, "Severe",   89.2, "Completed"),
+        ("CA-2410", demo_uid, "PT-8830", "2024-01-17", 60.7, "Normal",   95.9, "Completed"),
     ]
     for row in seed:
         try:
             cur.execute(
                 "INSERT INTO analyses "
-                "(analysis_id, patient_id, analysis_date, ejection_fraction,"
-                " severity, accuracy, status) VALUES (?,?,?,?,?,?,?)",
+                "(analysis_id, user_id, patient_id, analysis_date, ejection_fraction,"
+                " severity, accuracy, status) VALUES (?,?,?,?,?,?,?,?)",
                 row,
             )
         except sqlite3.IntegrityError:
             pass
+
+    # Backfill any orphaned rows (user_id=0) — reassign to the demo user
+    # so existing databases are transparently migrated
+    if demo_uid:
+        cur.execute(
+            "UPDATE analyses SET user_id = ? WHERE user_id = 0",
+            (demo_uid,)
+        )
 
     conn.commit()
     conn.close()
@@ -321,35 +341,118 @@ def login():
     return jsonify({"token": token, "name": user["name"]})
 
 
+@app.route("/signup", methods=["POST"])
+def signup():
+    body     = request.get_json(force=True, silent=True) or {}
+    name     = (body.get("name") or "").strip()
+    email    = (body.get("email") or "").strip().lower()
+    password = (body.get("password") or "").strip()
+
+    if not name:
+        return jsonify({"error": "Full name is required."}), 400
+    if not email:
+        return jsonify({"error": "Email address is required."}), 400
+    if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+        return jsonify({"error": "Please enter a valid email address."}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters long."}), 400
+    if not re.search(r'[A-Za-z]', password):
+        return jsonify({"error": "Password must contain at least one letter."}), 400
+    if not re.search(r'[0-9]', password):
+        return jsonify({"error": "Password must contain at least one number."}), 400
+
+    ph   = hashlib.sha256(password.encode()).hexdigest()
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email = ?", (email,)
+        ).fetchone()
+        if existing:
+            return jsonify({"error": "An account with this email already exists."}), 409
+        conn.execute(
+            "INSERT INTO users (name, email, pw_hash) VALUES (?, ?, ?)",
+            (name, email, ph),
+        )
+        conn.commit()
+        user_id = conn.execute(
+            "SELECT id FROM users WHERE email = ?", (email,)
+        ).fetchone()["id"]
+    finally:
+        conn.close()
+
+    exp   = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    token = jwt.encode(
+        {"uid": user_id, "email": email, "name": name, "exp": exp},
+        _SECRET,
+        algorithm="HS256",
+    )
+    return jsonify({"token": token, "name": name}), 201
+
+
 @app.route("/api/dashboard")
 @token_required
 def api_dashboard():
+    uid = request.current_user["uid"]
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM analyses ORDER BY analysis_date DESC, CAST(SUBSTR(analysis_id, 4) AS INTEGER) DESC"
-    ).fetchall()
-    conn.close()
+    try:
+        # Compute stats in SQL — scoped to the current user
+        stats_row = conn.execute("""
+            SELECT COUNT(*) as n,
+                   ROUND(AVG(accuracy), 1)          as avg_acc,
+                   ROUND(AVG(ejection_fraction), 1) as avg_ef,
+                   SUM(CASE WHEN severity='Normal'   THEN 1 ELSE 0 END) as cnt_normal,
+                   SUM(CASE WHEN severity='Mild'     THEN 1 ELSE 0 END) as cnt_mild,
+                   SUM(CASE WHEN severity='Moderate' THEN 1 ELSE 0 END) as cnt_moderate,
+                   SUM(CASE WHEN severity='Severe'   THEN 1 ELSE 0 END) as cnt_severe
+            FROM analyses WHERE user_id = ?
+        """, (uid,)).fetchone()
 
-    records = [dict(r) for r in rows]
-    n = len(records)
+        # Exclude overlay_image from the list response — send a has_overlay flag
+        # instead so the client can request the image on demand via /api/analysis/<id>/image
+        rows = conn.execute(
+            "SELECT analysis_id, patient_id, analysis_date, ejection_fraction, "
+            "severity, accuracy, status, "
+            "(overlay_image IS NOT NULL AND overlay_image != '') as has_overlay "
+            "FROM analyses WHERE user_id = ? ORDER BY analysis_date DESC, "
+            "CAST(SUBSTR(analysis_id, 4) AS INTEGER) DESC",
+            (uid,)
+        ).fetchall()
+    finally:
+        conn.close()
 
-    avg_acc = round(sum(r["accuracy"]           for r in records) / n, 1) if n else 0.0
-    avg_ef  = round(sum(r["ejection_fraction"]  for r in records) / n, 1) if n else 0.0
-
-    dist = {"Normal": 0, "Mild": 0, "Moderate": 0, "Severe": 0}
-    for r in records:
-        if r["severity"] in dist:
-            dist[r["severity"]] += 1
-
+    n = stats_row["n"] or 0
     return jsonify({
         "stats": {
             "total_analyses":        n,
-            "average_accuracy":      avg_acc,
-            "average_ef":            avg_ef,
-            "severity_distribution": dist,
+            "average_accuracy":      stats_row["avg_acc"] or 0.0,
+            "average_ef":            stats_row["avg_ef"]  or 0.0,
+            "severity_distribution": {
+                "Normal":   stats_row["cnt_normal"]   or 0,
+                "Mild":     stats_row["cnt_mild"]     or 0,
+                "Moderate": stats_row["cnt_moderate"] or 0,
+                "Severe":   stats_row["cnt_severe"]   or 0,
+            },
         },
-        "recent_analyses": records,
+        "recent_analyses": [dict(r) for r in rows],
     })
+
+
+@app.route("/api/analysis/<aid>/image")
+@token_required
+def api_analysis_image(aid):
+    """Return the segmentation overlay for a single analysis on demand."""
+    uid = request.current_user["uid"]
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT overlay_image FROM analyses WHERE analysis_id = ? AND user_id = ?",
+            (aid, uid)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row or not row["overlay_image"]:
+        return jsonify({"error": "Image not found."}), 404
+    return jsonify({"overlay_image": row["overlay_image"]})
 
 
 @app.route("/api/analyze", methods=["POST"])
@@ -377,6 +480,12 @@ def api_analyze():
     else:
         return jsonify({"error": "Unsupported format. Upload .h5, .png, or .jpg."}), 400
 
+    patient_id = (request.form.get("patient_id") or "").strip()
+    if not patient_id:
+        return jsonify({"error": "Patient ID is required."}), 400
+    if len(patient_id) > 50:
+        return jsonify({"error": "Patient ID must be 50 characters or fewer."}), 400
+
     try:
         import numpy as np
         file_bytes = mri_file.read()
@@ -393,34 +502,27 @@ def api_analyze():
 
         overlay_b64 = _render_overlay(img_input, pred_mask)
 
+        uid = request.current_user["uid"]
         conn = get_db()
+        try:
+            id_row = conn.execute(
+                "SELECT MAX(CAST(SUBSTR(analysis_id, 4) AS INTEGER)) AS max_ca "
+                "FROM analyses WHERE analysis_id LIKE 'CA-%'"
+            ).fetchone()
+            analysis_id = f"CA-{(id_row['max_ca'] or 2400) + 1}"
+            today       = datetime.date.today().isoformat()
 
-        # Auto-generate unique Patient ID
-        pt_row = conn.execute(
-            "SELECT MAX(CAST(SUBSTR(patient_id, 4) AS INTEGER)) "
-            "FROM analyses WHERE patient_id LIKE 'PT-%'"
-        ).fetchone()
-        patient_id  = f"PT-{(pt_row[0] or 8830) + 1}"
-
-        # Auto-generate unique Analysis ID
-        ca_row = conn.execute(
-            "SELECT MAX(CAST(SUBSTR(analysis_id, 4) AS INTEGER)) "
-            "FROM analyses WHERE analysis_id LIKE 'CA-%'"
-        ).fetchone()
-        next_num    = (ca_row[0] or 2400) + 1
-        analysis_id = f"CA-{next_num}"
-        today       = datetime.date.today().isoformat()
-
-        conn.execute(
-            "INSERT INTO analyses "
-            "(analysis_id, patient_id, analysis_date, ejection_fraction,"
-            " severity, accuracy, status, overlay_image) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (analysis_id, patient_id, today,
-             ef, severity, round(confidence, 1), "Completed", overlay_b64),
-        )
-        conn.commit()
-        conn.close()
+            conn.execute(
+                "INSERT INTO analyses "
+                "(analysis_id, user_id, patient_id, analysis_date, ejection_fraction,"
+                " severity, accuracy, status, overlay_image) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (analysis_id, uid, patient_id, today,
+                 ef, severity, round(confidence, 1), "Completed", overlay_b64),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         return jsonify({
             "analysis_id":       analysis_id,
@@ -440,6 +542,183 @@ def api_analyze():
         return jsonify({"error": f"Analysis failed: {str(exc)}"}), 500
 
 
+# ── Analyses list (searchable / filterable) ──────────────────────────────────
+
+@app.route("/api/analyses")
+@token_required
+def api_analyses_list():
+    uid      = request.current_user["uid"]
+    q        = request.args.get("q", "").strip()
+    severity = request.args.get("severity", "").strip()
+
+    where  = ["user_id = ?"]
+    params = [uid]
+    if q:
+        where.append("(patient_id LIKE ? OR analysis_id LIKE ?)")
+        params += [f"%{q}%", f"%{q}%"]
+    if severity:
+        where.append("severity = ?")
+        params.append(severity)
+
+    sql = (
+        "SELECT analysis_id, patient_id, analysis_date, ejection_fraction, "
+        "severity, accuracy, status, "
+        "(overlay_image IS NOT NULL AND overlay_image != '') as has_overlay "
+        f"FROM analyses WHERE {' AND '.join(where)} "
+        "ORDER BY analysis_date DESC, CAST(SUBSTR(analysis_id, 4) AS INTEGER) DESC"
+    )
+    conn = get_db()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"analyses": [dict(r) for r in rows]})
+
+
+# ── Patients list ─────────────────────────────────────────────────────────────
+
+@app.route("/api/patients")
+@token_required
+def api_patients():
+    uid  = request.current_user["uid"]
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT
+                a1.patient_id,
+                COUNT(*) AS total_analyses,
+                MAX(a1.analysis_date) AS last_analysis_date,
+                (SELECT ejection_fraction FROM analyses a2
+                  WHERE a2.patient_id = a1.patient_id AND a2.user_id = a1.user_id
+                  ORDER BY a2.analysis_date DESC,
+                           CAST(SUBSTR(a2.analysis_id, 4) AS INTEGER) DESC
+                  LIMIT 1) AS last_ef,
+                (SELECT severity FROM analyses a2
+                  WHERE a2.patient_id = a1.patient_id AND a2.user_id = a1.user_id
+                  ORDER BY a2.analysis_date DESC,
+                           CAST(SUBSTR(a2.analysis_id, 4) AS INTEGER) DESC
+                  LIMIT 1) AS last_severity
+            FROM analyses a1
+            WHERE user_id = ?
+            GROUP BY a1.patient_id
+            ORDER BY last_analysis_date DESC, a1.patient_id DESC
+        """, (uid,)).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"patients": [dict(r) for r in rows]})
+
+
+# ── Analyses for a specific patient ──────────────────────────────────────────
+
+@app.route("/api/patients/<pid>/analyses")
+@token_required
+def api_patient_analyses(pid):
+    uid  = request.current_user["uid"]
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT analysis_id, patient_id, analysis_date, ejection_fraction, "
+            "severity, accuracy, status, "
+            "(overlay_image IS NOT NULL AND overlay_image != '') as has_overlay "
+            "FROM analyses WHERE user_id = ? AND patient_id = ? "
+            "ORDER BY analysis_date DESC, CAST(SUBSTR(analysis_id, 4) AS INTEGER) DESC",
+            (uid, pid)
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"analyses": [dict(r) for r in rows]})
+
+
+# ── Settings: update profile ──────────────────────────────────────────────────
+
+@app.route("/api/settings/profile", methods=["POST"])
+@token_required
+def api_settings_profile():
+    uid  = request.current_user["uid"]
+    body = request.get_json(force=True, silent=True) or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Full name is required."}), 400
+    if len(name) < 2 or len(name) > 50:
+        return jsonify({"error": "Name must be between 2 and 50 characters long."}), 400
+    if not re.match(r"^[a-zA-Z\s\-'.,]{2,50}$", name):
+        return jsonify({"error": "Name contains invalid characters. Only letters, spaces, hyphens, apostrophes, and periods are allowed."}), 400
+    conn = get_db()
+    try:
+        conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, uid))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "name": name})
+
+
+# ── Settings: change password ─────────────────────────────────────────────────
+
+@app.route("/api/settings/password", methods=["POST"])
+@token_required
+def api_settings_password():
+    uid        = request.current_user["uid"]
+    body       = request.get_json(force=True, silent=True) or {}
+    current_pw = (body.get("current_password") or "").strip()
+    new_pw     = (body.get("new_password")      or "").strip()
+    if not current_pw or not new_pw:
+        return jsonify({"error": "Both current and new password are required."}), 400
+    if len(new_pw) < 8:
+        return jsonify({"error": "New password must be at least 8 characters."}), 400
+    if not re.search(r'[A-Za-z]', new_pw):
+        return jsonify({"error": "New password must contain at least one letter."}), 400
+    if not re.search(r'[0-9]', new_pw):
+        return jsonify({"error": "New password must contain at least one number."}), 400
+    current_hash = hashlib.sha256(current_pw.encode()).hexdigest()
+    conn = get_db()
+    try:
+        user = conn.execute(
+            "SELECT id FROM users WHERE id = ? AND pw_hash = ?",
+            (uid, current_hash)
+        ).fetchone()
+        if not user:
+            return jsonify({"error": "Current password is incorrect."}), 400
+        new_hash = hashlib.sha256(new_pw.encode()).hexdigest()
+        conn.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (new_hash, uid))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True})
+
+
+# ── Export: CSV download ──────────────────────────────────────────────────────
+
+@app.route("/api/export/csv")
+@token_required
+def api_export_csv():
+    import csv as _csv
+    uid  = request.current_user["uid"]
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT analysis_id, patient_id, analysis_date, ejection_fraction, "
+            "severity, accuracy, status FROM analyses WHERE user_id = ? "
+            "ORDER BY analysis_date DESC, CAST(SUBSTR(analysis_id, 4) AS INTEGER) DESC",
+            (uid,)
+        ).fetchall()
+    finally:
+        conn.close()
+    buf = io.StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(["Analysis ID", "Patient ID", "Date",
+                     "Ejection Fraction (%)", "Severity",
+                     "Model Confidence (%)", "Status"])
+    for r in rows:
+        writer.writerow([r["analysis_id"], r["patient_id"], r["analysis_date"],
+                         r["ejection_fraction"], r["severity"],
+                         r["accuracy"], r["status"]])
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=cardioai_analyses.csv"}
+    )
+
+
 # ── Startup ───────────────────────────────────────────────────────────────────
 # Run init regardless of how Flask is started (python app.py or flask run)
 init_db()
@@ -448,8 +727,8 @@ _load_model()
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8000))
     debug = os.environ.get("FLASK_ENV") == "development"
     print(f" * CardioAI backend → http://127.0.0.1:{port}")
     print(" * Demo credentials → demo@cardioai.com / Demo@1234")
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    app.run(debug=debug, host="127.0.0.1", port=port)

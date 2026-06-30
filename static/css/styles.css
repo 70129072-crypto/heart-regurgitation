@@ -504,6 +504,22 @@ ul {
   transform: none;
 }
 
+/* Auth form toggle (sign-in ↔ sign-up) */
+.auth-toggle {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+.auth-toggle a {
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-toggle a:hover {
+  text-decoration: underline;
+}
+
 /* Page counter */
 .page-counter {
   position: absolute;
@@ -728,6 +744,10 @@ ul {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Page heading ────────────────────────────────────────────── */
@@ -1644,4 +1664,296 @@ ul {
   font-size: 12px;
   color: #94a3b8;
   text-align: center;
+}
+
+/* ================================================================
+   VIEW SECTION (SPA)
+   ================================================================ */
+.view-section {
+  display: block;
+}
+
+/* ================================================================
+   FILTER BAR (Analyses view)
+   ================================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 30px 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.search-box-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+}
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 9px 13px 9px 36px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.12);
+}
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+.filter-select {
+  padding: 9px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.18s;
+}
+.filter-select:focus {
+  border-color: var(--primary);
+}
+
+/* ================================================================
+   HEADING ACTIONS (Reports view)
+   ================================================================ */
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   BACK BUTTON (Patients view)
+   ================================================================ */
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text-mid);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  margin-bottom: 4px;
+}
+.btn-back:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+/* ================================================================
+   SEVERITY BARS (Reports view)
+   ================================================================ */
+.severity-bars-wrap {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sev-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sev-bar-label {
+  width: 88px;
+  flex-shrink: 0;
+}
+.sev-bar-track {
+  flex: 1;
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.sev-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+.sev-bar-count {
+  width: 80px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.sev-bar-pct {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ================================================================
+   SETTINGS GRID & CARDS
+   ================================================================ */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  padding: 22px 30px 30px;
+}
+.settings-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-card-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.settings-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.settings-card-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 3px 0 0;
+}
+.settings-card-body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-input {
+  width: 100%;
+  padding: 9px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.settings-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.12);
+}
+.settings-input::placeholder {
+  color: var(--text-muted);
+}
+.settings-input--readonly {
+  background: #f8fafc;
+  color: var(--text-mid);
+  cursor: not-allowed;
+}
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.settings-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+}
+.settings-msg--success {
+  background: var(--success-light);
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.settings-msg--error {
+  background: var(--danger-light);
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+/* ================================================================
+   TABLE CARD HEADER LEFT (multi-element variant)
+   ================================================================ */
+.table-card-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ================================================================
+   PRINT STYLES
+   ================================================================ */
+@media print {
+  .sidebar,
+  .topbar,
+  .page-heading .heading-actions,
+  .page-heading .btn-new-analysis,
+  .page-heading .btn-refresh,
+  #view-overview,
+  #view-analyses,
+  #view-patients,
+  #view-settings,
+  .btn-view-scan,
+  .modal-backdrop {
+    display: none !important;
+  }
+  .dashboard-page {
+    display: block;
+    height: auto;
+  }
+  .main-content {
+    overflow: visible;
+  }
+  #view-reports {
+    display: block !important;
+  }
+  .page-heading {
+    padding: 0 0 16px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
